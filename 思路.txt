@@ -1,0 +1,166 @@
+1. 首先根据提供的url值得出文件类型：
+url.getFile();
+然后用"."分离出文件类型
+注意：
+如果用“.”作为分隔的话，必须是如下写法：String.split("\\."),这样才能正确的分隔开，不能用String.split(".");
+
+2. 为什么以下面这种方式下载下来的东西会非常大？？明明只有几百kb的，却上G了？？
+是因为其中还包括了许多其他的链接资源里面的东西吗，但是我打开看的时候也没有啊？？
+而且以下面这种方式下载下来的网页会有中文乱码（就是本意会改变）（这个应该可以理解）
+----------------------------------------------------------
+   public static void WebDownLoad(String savePath,URL url)
+    {
+            File file = new File(savePath);
+            try
+            {
+                InputStream in = url.openStream();
+                InputStreamReader reader = new InputStreamReader(in);
+                FileOutputStream of = new FileOutputStream(file);
+                OutputStreamWriter writer = new OutputStreamWriter(of);
+                char c;
+                while((c=(char)reader.read())!=-1)
+                {
+                    writer.write(c);
+                }
+                writer.close();
+                of.close();
+                reader.close();
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+
+    }
+----------------------------------------------------------
+
+
+--------------------------------------------------------------
+public class Demo
+{
+    public static void PictureDownLoad(String savePath,URL url)
+    {
+        try
+        {
+            File file = new File(savePath);
+            InputStream in = url.openStream();
+            FileOutputStream of = new FileOutputStream(file);
+            byte b[] = new byte[1];
+            while ((in.read(b)) != -1)
+            {
+                of.write(b);
+            }
+            of.close();
+            in.close();
+        }catch(IOException e)
+        {}
+
+    }
+    //这种写法，为什么下载下来的文件超大呢？？
+    public static void WebDownLoad(String savePath,URL url)
+    {
+            File file = new File(savePath);
+            try
+            {
+                InputStream in = url.openStream();
+                InputStreamReader reader = new InputStreamReader(in);
+                FileOutputStream of = new FileOutputStream(file);
+                OutputStreamWriter writer = new OutputStreamWriter(of);
+                char c;
+                while((c=(char)reader.read())!=-1)
+                {
+                    writer.write(c);
+                }
+                writer.close();
+                of.close();
+                reader.close();
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+
+    }
+
+    public static void main(String[]args)
+    {
+//        String fileName = "http://t2.27270.com/uploads/tu/201707/9999/44017f1fbb.jpg";
+//        String fileName = "https://wenku.baidu.com/view/83a13a126c175f0e7cd1372a.html";
+        /*String fileName = "http://39.108.79.219/topic/83/android" +
+                "%E7%BB%842017%E5%A4%8F%E4%BB%A4%E8%90%A5%E7%AC%AC%E4%B8%80%E6%9C%9F%E6%96%B0%E4%BA%BA%E4%BB%BB%E5%8A%A1";
+        */
+//        String fileName = "http://blog.csdn.net/w410589502/article/details/53818137";
+//        String fileName = "http://img.boqiicdn.com/Data/Bbs/Users/135/13516/1351667/img32061381071677.gif";
+//        String fileName = "https://www.w3cschool.cn/";
+        String fileName = "http://39.108.79.219/";
+        URL url = null;
+        String savePath = "F:"+File.separator+"Java"+File.separator;
+        try
+        {
+            //得出待下载的文件格式，并创建一个同样的文件存储
+            url = new URL(fileName);
+            String str = url.getFile();
+            String num[] = str.split("\\.");
+            String fileKind = "";
+            if(num.length!=1)
+                fileKind = num[num.length-1];
+            else
+                fileKind = "html";
+            savePath += "1."+fileKind;
+            System.out.println(fileKind);
+
+            //写入文件
+            PictureDownLoad(savePath,url);
+        }catch(IOException e)
+        {}
+        System.out.println("文件下载完成！");
+    }
+}
+
+------------------------
+获取文件大小，以字节为单位
+ URL url = new URL(fileName);
+ URLConnection urlConnection = url.openConnection();
+ System.out.println(urlConnection.getContentLength());
+
+
+-----------------------------
+2.从Internet获取文件
+利用HttpURLConnection对象,我们可以从网络中获取文件数据.
+1)创建URL对象,并将文件路径传入:URL url = new URL("http://photocdn.sohu.com/20100125/Img269812337.jpg");
+2)创建HttpURLConnection对象,从网络中获取文件数据:HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+3)设置连接超时:conn.setConnectTimeout(6* 1000);
+4)对响应码进行判断:if (conn.getResponseCode() != 200) throw new RuntimeException("请求url失败");
+5)得到网络返回的输入流:InputStream is = conn.getInputStream();
+6)将得到的文件流写出:outStream.write(buffer, 0, len);
+总结:
+--在对大文件的操作时,要将文件写到SDCard上面,不要直接写到手机内存上.
+--操作大文件是,要一遍从网络上读,一遍要往SDCard上面写,减少手机内存的使用.这点很重要,面试经常会被问到.
+--对文件流操作完,要记得及时关闭.
+
+
+
+-------------------------------
+代码设计的时候，DownLoad类是所有线程共有的属性，类似于准备工作，所以我觉得应该抽象出来
+单独成为一个类，而不应该和运行线程的类混合在一起,但是如果这样的话，会让DownLoad类对外界
+提供更多的接口，这样不会使代码显得很冗余吗？？；不优雅:)!?
+另一方面疑惑的是抽象出DownLoad类各个数据是应该设计成static的呢，还是说应该设计成与对象
+相关的？（对于这个我得疑惑是，一方面这些数据也是几个线程共有的，所以我觉得应该设计成对
+象无关static形式；但是另一方面考虑到为了程序的扩展性，还是应该设计成对象相关的）
+
+思考：在run方法中应该做什么？应该做的就只是下载对应线程的对应区块
+
+-----------------------------------
+while ((in.read(b)) != -1&&count<perSum)
+此处引起的下载数据错位，逻辑处理不是很清楚，有点太随意了？？
+-------------------------------------
+Callable+Future
+这样的下载速度为什么会很慢，或者说这样的并发为什么会很慢？？
+而且是否是这个导致了java.exe占用内存瞬间增大？？
+
+
+
+
+
+
+
+
+

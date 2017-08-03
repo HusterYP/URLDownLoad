@@ -1,0 +1,161 @@
+class DownLoad
+{
+    //如果这里要设计成static的话，那就与对象无关，但是后面提供的访问接口又是
+    //非static的，那么要访问这些接口就需要对象，那么这里设置为static就没用咯
+    private static String savePath="";//文件保存路径
+    private static int threadCount;//线程数量
+    private static long totalLength;//文件总长度
+    private static URL url;
+
+    //构造函数，设置各个线程共有的属性
+    public DownLoad(String n,URL url,int threadCount)
+    {
+        savePath = n;
+        DownLoad.url = url;
+        DownLoad.threadCount = threadCount;
+        try
+        {
+            URLConnection urlConnection = DownLoad.url.openConnection();
+            totalLength = urlConnection.getContentLength();//获取文件长度
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        setSavePath();//创建保存文件
+    }
+    public static void setSavePath()
+    {
+        //得出待下载的文件格式，并创建一个同样的文件存储
+        String str = url.getFile();
+        String num[] = str.split("\\.");
+        String fileKind = "";
+        if(num.length!=1)//通过获取的文件名分片得出文件类型，jpg,gif,html等
+            fileKind = num[num.length-1];
+        else
+            fileKind = "html";
+        savePath += "1."+fileKind;
+    }
+    //属性获取
+    public File getSaveFile()
+    {
+        return new File(savePath);
+    }
+    public URL getURL()
+    {
+        return url;
+    }
+    public int getThreadCount()
+    {
+        return threadCount;
+    }
+    public long getTotalLength()
+    {
+        return totalLength;
+    }
+}
+
+//这个类主要是针对单个线程的，单个线程应该做什么
+class ThreadRun  implements Callable
+{
+    private DownLoad downLoad;
+    private Vector<Byte> bytes = new Vector<>();//存储字节,以字节写入
+    private long perSum;//每个线程应该下载的字节长度,线程相关
+    private long skipCount;//应该跳过的字节长度，线程相关
+
+    public ThreadRun(DownLoad d,int i)//i表示第几条线程
+    {
+        downLoad = d;
+        if(i==d.getThreadCount())//如果是最后一条线程
+        {
+            //最后一条线程的总下载量应该是文件总长度-其他线程的下载量
+            perSum = d.getTotalLength() - (d.getTotalLength()/d.getThreadCount())*(i-1)+2000;
+            //最后一条线程应该跳过的字节长度
+            skipCount = (d.getTotalLength()/d.getThreadCount())*(i-1);
+            System.out.println(perSum+"  "+skipCount);
+        }
+        else
+        {
+            //如果不是最后一条线程，每条线程的下载量应该是 总文件长度/线程数量
+            perSum = d.getTotalLength() / d.getThreadCount();
+            //跳过字节长度
+            skipCount = (i - 1) * perSum;
+            System.out.println(perSum+"  "+skipCount);
+        }
+    }
+    //通过获取的单个线程的下载量和跳过的字节数，下载对应线程的字节，线程相关
+    public Vector<Byte> call()
+    {
+        System.out.println(Thread.currentThread().getName());
+        InputStream in;
+        long count = 0;//计数，已经接受了多少字节
+        try
+        {
+            in = downLoad.getURL().openStream();
+            in.skip(skipCount);
+
+            byte b[] = new byte[1];
+            while ((in.read(b)) != -1&&count<perSum)//如果没有达到文件末尾，而且对应线程的下载量没有完成
+            {
+                count++;
+                bytes.add(b[0]);
+//                Thread.yield();
+            }
+            in.close();
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        return bytes;
+    }
+}
+
+//这个类是根据传入的线程数量来开启对应数量的线程
+class BeginThread
+{
+    private DownLoad downLoad;
+    private File file;
+
+    public BeginThread(DownLoad d)
+    {
+        downLoad = d;
+        file = d.getSaveFile();//返回保存的文件引用
+    }
+    //开启线程
+    public void BeginRun() throws ExecutionException, InterruptedException, IOException
+    {
+        ExecutorService exec = Executors.newCachedThreadPool();
+        Vector<Future<Vector<Byte>>> sumByte = new Vector<Future<Vector<Byte>>>();
+        for(int i=0;i<downLoad.getThreadCount();i++)
+        {
+            sumByte.add(exec.submit(new ThreadRun(downLoad,i+1)));
+        }
+        FileOutputStream of = new FileOutputStream(file);
+        for(Future<Vector<Byte>> bytes:sumByte)
+        {
+            System.out.println(bytes.get().capacity());
+            for(int i=0;i<bytes.get().size();i++)
+            {
+                of.write(bytes.get().get(i));
+            }
+        }
+    }
+}
+
+
+public class Main
+{
+    public static void main(String[]args) throws ExecutionException, InterruptedException, IOException
+    {
+//        String webAddress = "http://39.108.79.219/";
+//        String webAddress = "http://t2.27270.com/uploads/tu/201707/9999/44017f1fbb.jpg";
+        String webAddress = "http://img.boqiicdn.com/Data/Bbs/Users/135/13516/1351667/img32061381071677.gif";
+        String savePath = "F:"+File.separator+"Java"+File.separator;
+        int threadCount = 1;//线程数量
+        URL url = new URL(webAddress);
+        DownLoad downLoad = new DownLoad(savePath,url,threadCount);
+        BeginThread beginThread = new BeginThread(downLoad);
+        beginThread.BeginRun();
+
+        System.out.println("Main Thread is dead");
+    }
+}
